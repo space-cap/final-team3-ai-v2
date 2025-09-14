@@ -8,7 +8,7 @@ from pathlib import Path
 
 import chromadb
 from chromadb.config import Settings
-from langchain.vectorstores import Chroma
+from langchain_chroma import Chroma
 from langchain.embeddings.openai import OpenAIEmbeddings
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain.docstore.document import Document

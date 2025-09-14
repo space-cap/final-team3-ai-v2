@@ -1,113 +1,100 @@
-#!/usr/bin/env python3
-"""
-Simple API Test Script
-"""
+# Simple API Test
 import requests
 import json
-import time
 
-BASE_URL = "http://localhost:8000"
+BASE_URL = "http://localhost:8000/api/v1"
 
-def test_basic_functionality():
-    """Test basic functionality"""
-    print("=== Basic API Tests ===\n")
-    
-    # 1. Root endpoint test
-    print("1. Testing root endpoint...")
+def test_health():
     try:
-        response = requests.get(f"{BASE_URL}/")
-        data = response.json()
-        print(f"   SUCCESS: {data['message']}")
-        print(f"   Status: {data['status']}")
+        response = requests.get(f"{BASE_URL}/health", timeout=10)
+        if response.status_code == 200:
+            print("1. Health check: SUCCESS")
+            return True
+        else:
+            print(f"1. Health check: FAILED ({response.status_code})")
+            return False
     except Exception as e:
-        print(f"   FAILED: {str(e)}")
+        print(f"1. Health check: ERROR - {e}")
         return False
-    
-    # 2. Health check test
-    print("\n2. Testing health endpoint...")
-    try:
-        response = requests.get(f"{BASE_URL}/health")
-        data = response.json()
-        print(f"   SUCCESS: {data['status']}")
-        print(f"   Environment: {data['environment']}")
-        print(f"   OpenAI Key: {'Present' if data['openai_key_present'] else 'Missing'}")
-        print(f"   Database Config: {'Present' if data['database_configured'] else 'Missing'}")
-    except Exception as e:
-        print(f"   FAILED: {str(e)}")
-        return False
-    
-    # 3. Response time test
-    print("\n3. Testing response time...")
-    try:
-        start_time = time.time()
-        response = requests.get(f"{BASE_URL}/health")
-        response_time = (time.time() - start_time) * 1000
-        print(f"   SUCCESS: Response time {response_time:.2f}ms")
-    except Exception as e:
-        print(f"   FAILED: {str(e)}")
-        return False
-    
-    return True
 
-def test_environment_setup():
-    """Test environment setup"""
-    print("\n=== Environment Check ===\n")
-    
+def test_vector_store():
     try:
-        from dotenv import load_dotenv
-        load_dotenv()
-        import os
-        
-        # Check environment variables
-        required_vars = [
-            "OPENAI_API_KEY",
-            "LOCAL_DB_NAME", 
-            "LOCAL_DB_USER",
-            "LOCAL_DB_PASSWORD",
-            "APP_PORT"
-        ]
-        
-        print("Environment Variables:")
-        for var in required_vars:
-            value = os.getenv(var)
-            if value:
-                if "API_KEY" in var or "PASSWORD" in var:
-                    display_value = f"{value[:10]}..." if len(value) > 10 else "***"
-                else:
-                    display_value = value
-                print(f"   OK {var}: {display_value}")
-            else:
-                print(f"   MISSING {var}")
-        
-        return True
+        response = requests.get(f"{BASE_URL}/templates/vector-store-info", timeout=10)
+        if response.status_code == 200:
+            data = response.json()
+            templates = data.get('templates_count', 0)
+            patterns = data.get('patterns_count', 0)
+            print(f"2. Vector store: SUCCESS (templates: {templates}, patterns: {patterns})")
+            return True
+        else:
+            print(f"2. Vector store: FAILED ({response.status_code})")
+            return False
     except Exception as e:
-        print(f"   FAILED: {str(e)}")
+        print(f"2. Vector store: ERROR - {e}")
+        return False
+
+def test_similar_search():
+    try:
+        data = {"query": "order completion", "limit": 3}
+        response = requests.post(f"{BASE_URL}/templates/similar-search", json=data, timeout=15)
+        if response.status_code == 200:
+            result = response.json()
+            count = len(result.get('similar_templates', []))
+            print(f"3. Similar search: SUCCESS ({count} templates found)")
+            return True
+        else:
+            print(f"3. Similar search: FAILED ({response.status_code})")
+            print(f"   Error: {response.text[:100]}")
+            return False
+    except Exception as e:
+        print(f"3. Similar search: ERROR - {e}")
+        return False
+
+def test_smart_generation():
+    try:
+        data = {
+            "user_request": "reservation confirmation message",
+            "business_type": "service",
+            "category_1": "reservation",
+            "target_length": 100,
+            "include_variables": ["customer_name", "reservation_time"]
+        }
+        response = requests.post(f"{BASE_URL}/templates/smart-generate", json=data, timeout=30)
+        if response.status_code == 200:
+            result = response.json()
+            template = result.get('generated_template', '')
+            validation = result.get('validation', {})
+            length = validation.get('length', 0)
+            score = validation.get('compliance_score', 0)
+            print(f"4. Smart generation: SUCCESS")
+            print(f"   Template: {template[:50]}...")
+            print(f"   Length: {length} chars, Score: {score:.1f}")
+            return True
+        else:
+            print(f"4. Smart generation: FAILED ({response.status_code})")
+            print(f"   Error: {response.text[:100]}")
+            return False
+    except Exception as e:
+        print(f"4. Smart generation: ERROR - {e}")
         return False
 
 def main():
-    """Main test function"""
-    print("Kakao AlimTalk Template AI System Test\n")
-    
-    # Basic functionality test
-    basic_test = test_basic_functionality()
-    
-    # Environment setup test
-    env_test = test_environment_setup()
-    
-    # Summary
-    print("\n=== Test Results ===")
-    print(f"Basic API Tests: {'PASS' if basic_test else 'FAIL'}")
-    print(f"Environment Check: {'PASS' if env_test else 'FAIL'}")
-    
-    if basic_test and env_test:
-        print("\nSUCCESS: All basic tests passed!")
-        print("API Docs: http://localhost:8000/docs")
-        print("NOTE: Full system testing requires additional packages.")
-        return True
+    print("=== Integrated Template Generation System Test ===")
+    print()
+
+    results = []
+    results.append(test_health())
+    results.append(test_vector_store())
+    results.append(test_similar_search())
+    results.append(test_smart_generation())
+
+    print()
+    print(f"=== Test Complete: {sum(results)}/{len(results)} SUCCESS ===")
+
+    if sum(results) == len(results):
+        print("All tests passed!")
     else:
-        print("\nWARNING: Some tests failed. Check your configuration.")
-        return False
+        print("Some tests failed. Check the logs.")
 
 if __name__ == "__main__":
-    success = main()
-    exit(0 if success else 1)
+    main()

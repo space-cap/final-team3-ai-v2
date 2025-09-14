@@ -189,3 +189,80 @@ class HealthResponse(BaseResponse):
     status: SystemStatus = Field(description="시스템 상태")
     version: str = Field(description="애플리케이션 버전")
     environment: str = Field(description="실행 환경")
+
+# 새로운 템플릿 생성 관련 스키마
+class SmartTemplateGenerationRequest(BaseModel):
+    """스마트 템플릿 생성 요청"""
+    user_request: str = Field(..., min_length=1, max_length=500, description="사용자 템플릿 생성 요청")
+    business_type: Optional[str] = Field(None, description="업무 유형 (서비스, 상품, 예약 등)")
+    category_1: Optional[str] = Field(None, description="1차 분류")
+    category_2: Optional[str] = Field(None, description="2차 분류")
+    target_length: Optional[int] = Field(None, ge=50, le=300, description="목표 길이")
+    include_variables: Optional[List[str]] = Field(default=[], description="포함할 변수 목록")
+    context: Optional[Dict[str, Any]] = Field(default={}, description="추가 컨텍스트")
+
+class TemplateValidation(BaseModel):
+    """템플릿 검증 결과"""
+    length: int = Field(description="템플릿 길이")
+    length_appropriate: bool = Field(description="길이 적절성")
+    has_greeting: bool = Field(description="인사말 포함 여부")
+    variables: List[str] = Field(description="사용된 변수 목록")
+    variable_count: int = Field(description="변수 개수")
+    has_politeness: bool = Field(description="정중한 표현 사용 여부")
+    potential_ad_content: bool = Field(description="광고성 내용 포함 가능성")
+    has_contact_info: bool = Field(description="연락처 정보 포함 여부")
+    sentence_count: int = Field(description="문장 수")
+    compliance_score: float = Field(description="정책 준수 점수 (0-100)")
+
+class SmartTemplateGenerationResponse(BaseResponse):
+    """스마트 템플릿 생성 응답"""
+    generated_template: str = Field(description="생성된 템플릿")
+    validation: TemplateValidation = Field(description="템플릿 검증 결과")
+    suggestions: List[str] = Field(description="개선 제안사항")
+    reference_data: Dict[str, Any] = Field(description="참조 데이터 정보")
+    metadata: Dict[str, Any] = Field(description="생성 메타데이터")
+
+class TemplateOptimizationRequest(BaseModel):
+    """템플릿 최적화 요청"""
+    template: str = Field(..., min_length=1, description="최적화할 템플릿")
+    target_improvements: Optional[List[str]] = Field(default=[], description="개선 목표 사항")
+
+class TemplateOptimizationResponse(BaseResponse):
+    """템플릿 최적화 응답"""
+    original_template: str = Field(description="원본 템플릿")
+    optimized_template: str = Field(description="최적화된 템플릿")
+    original_validation: TemplateValidation = Field(description="원본 검증 결과")
+    optimized_validation: TemplateValidation = Field(description="최적화된 검증 결과")
+    improvement: Dict[str, float] = Field(description="개선 사항")
+
+class TemplateSimilarSearchRequest(BaseModel):
+    """유사 템플릿 검색 요청"""
+    query: str = Field(..., min_length=1, description="검색 쿼리")
+    category_filter: Optional[str] = Field(None, description="카테고리 필터")
+    business_type_filter: Optional[str] = Field(None, description="업무 유형 필터")
+    limit: int = Field(default=5, ge=1, le=20, description="결과 개수")
+
+class TemplateInfo(BaseModel):
+    """템플릿 정보"""
+    template_id: str = Field(description="템플릿 ID")
+    text: str = Field(description="템플릿 텍스트")
+    category_1: Optional[str] = Field(description="1차 분류")
+    category_2: Optional[str] = Field(description="2차 분류")
+    business_type: Optional[str] = Field(description="업무 유형")
+    variables: List[str] = Field(description="사용된 변수")
+    button: Optional[str] = Field(description="버튼")
+    length: int = Field(description="길이")
+
+class TemplateSimilarSearchResponse(BaseResponse):
+    """유사 템플릿 검색 응답"""
+    query: str = Field(description="검색 쿼리")
+    similar_templates: List[TemplateInfo] = Field(description="유사한 템플릿 목록")
+    category_patterns: List[Dict[str, Any]] = Field(description="카테고리 패턴 정보")
+    suggestions: List[str] = Field(description="제안사항")
+
+class TemplateVectorStoreInfoResponse(BaseResponse):
+    """템플릿 벡터 스토어 정보 응답"""
+    templates_count: int = Field(description="템플릿 문서 수")
+    patterns_count: int = Field(description="패턴 문서 수")
+    status: str = Field(description="상태")
+    persist_directory: Optional[str] = Field(description="저장 디렉토리")

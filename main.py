@@ -75,7 +75,21 @@ async def lifespan(app: FastAPI):
         # RAG 서비스 초기화 확인
         from app.services.rag_service import rag_service
         logger.info("✓ RAG 서비스 초기화 완료")
-        
+
+        # 템플릿 벡터 데이터베이스 상태 확인
+        try:
+            from app.services.template_vector_store import template_vector_store_service
+            template_store_info = template_vector_store_service.get_store_info()
+            if template_store_info.get('status') == 'available':
+                templates_count = template_store_info.get('templates_count', 0)
+                patterns_count = template_store_info.get('patterns_count', 0)
+                logger.info(f"✓ 템플릿 벡터DB 로드 성공 (템플릿: {templates_count}, 패턴: {patterns_count})")
+            else:
+                logger.warning("⚠ 템플릿 벡터DB 상태 확인 실패")
+        except Exception as e:
+            logger.warning(f"⚠ 템플릿 벡터DB 로드 실패: {e}")
+            logger.info("✓ 템플릿 벡터DB 없이 시스템 시작")
+
         logger.info("=== 시스템 초기화 완료 ===")
         
     except Exception as e:

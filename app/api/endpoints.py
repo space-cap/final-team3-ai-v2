@@ -17,6 +17,8 @@ from app.models import Session as DBSession, Query, Template, Prompt
 from app.models.queries import QueryStatus
 from app.services.rag_service import rag_service
 from app.services.token_service import token_service
+from app.services.template_generation_service import template_generation_service
+from app.services.template_vector_store import template_vector_store_service
 try:
     from app.services.vector_store_simple import simple_vector_store_service as vector_store_service
 except ImportError:
@@ -601,3 +603,183 @@ def _analyze_template_content(content: str) -> Dict[str, Any]:
             "compliance_score": 0.5,
             "suggestions": ["템플릿 분석 중 오류가 발생했습니다."]
         }
+
+# 새로운 스마트 템플릿 생성 API 엔드포인트들
+
+@router.post("/templates/smart-generate", response_model=SmartTemplateGenerationResponse)
+async def smart_generate_template(
+    request: SmartTemplateGenerationRequest
+):
+    """
+    스마트 템플릿 생성 - 승인받은 패턴 기반 AI 생성
+    """
+    try:
+        # 템플릿 생성 서비스 호출
+        result = template_generation_service.generate_template(
+            user_request=request.user_request,
+            business_type=request.business_type,
+            category_1=request.category_1,
+            category_2=request.category_2,
+            target_length=request.target_length,
+            include_variables=request.include_variables
+        )
+
+        if not result["success"]:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=result.get("error", "템플릿 생성에 실패했습니다.")
+            )
+
+        # 응답 데이터 변환
+        validation_data = result["validation"]
+        validation = TemplateValidation(
+            length=validation_data["length"],
+            length_appropriate=validation_data["length_appropriate"],
+            has_greeting=validation_data["has_greeting"],
+            variables=validation_data["variables"],
+            variable_count=validation_data["variable_count"],
+            has_politeness=validation_data["has_politeness"],
+            potential_ad_content=validation_data["potential_ad_content"],
+            has_contact_info=validation_data["has_contact_info"],
+            sentence_count=validation_data["sentence_count"],
+            compliance_score=validation_data["compliance_score"]
+        )
+
+        return SmartTemplateGenerationResponse(
+            success=True,
+            message="스마트 템플릿이 성공적으로 생성되었습니다.",
+            generated_template=result["generated_template"],
+            validation=validation,
+            suggestions=result["suggestions"],
+            reference_data=result["reference_data"],
+            metadata=result["metadata"]
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"스마트 템플릿 생성 중 오류가 발생했습니다: {str(e)}"
+        )
+
+@router.post("/templates/optimize", response_model=TemplateOptimizationResponse)
+async def optimize_template(
+    request: TemplateOptimizationRequest
+):
+    """
+    템플릿 최적화 - 기존 템플릿을 정책에 맞게 개선
+    """
+    try:
+        # 템플릿 최적화 서비스 호출
+        result = template_generation_service.optimize_template(
+            template=request.template,
+            target_improvements=request.target_improvements
+        )
+
+        if not result["success"]:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail=result.get("error", "템플릿 최적화에 실패했습니다.")
+            )
+
+        # 검증 데이터 변환
+        def convert_validation(validation_data):
+            return TemplateValidation(
+                length=validation_data["length"],
+                length_appropriate=validation_data["length_appropriate"],
+                has_greeting=validation_data["has_greeting"],
+                variables=validation_data["variables"],
+                variable_count=validation_data["variable_count"],
+                has_politeness=validation_data["has_politeness"],
+                potential_ad_content=validation_data["potential_ad_content"],
+                has_contact_info=validation_data["has_contact_info"],
+                sentence_count=validation_data["sentence_count"],
+                compliance_score=validation_data["compliance_score"]
+            )
+
+        return TemplateOptimizationResponse(
+            success=True,
+            message="템플릿이 성공적으로 최적화되었습니다.",
+            original_template=result["original_template"],
+            optimized_template=result["optimized_template"],
+            original_validation=convert_validation(result["original_validation"]),
+            optimized_validation=convert_validation(result["optimized_validation"]),
+            improvement=result["improvement"]
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"템플릿 최적화 중 오류가 발생했습니다: {str(e)}"
+        )
+
+@router.post("/templates/similar-search", response_model=TemplateSimilarSearchResponse)
+async def search_similar_templates(
+    request: TemplateSimilarSearchRequest
+):
+    """
+    유사한 승인받은 템플릿 검색
+    """
+    try:
+        # 템플릿 추천 서비스 호출
+        recommendations = template_vector_store_service.get_template_recommendations(
+            user_input=request.query,
+            category_1=request.category_filter,
+            business_type=request.business_type_filter
+        )
+
+        # 템플릿 정보 변환
+        similar_templates = []
+        for template in recommendations['similar_templates'][:request.limit]:
+            template_info = TemplateInfo(
+                template_id=template.get('template_id', ''),
+                text=template.get('text', ''),
+                category_1=template.get('category_1'),
+                category_2=template.get('category_2'),
+                business_type=template.get('business_type'),
+                variables=template.get('variables', []),
+                button=template.get('button'),
+                length=template.get('length', 0)
+            )
+            similar_templates.append(template_info)
+
+        return TemplateSimilarSearchResponse(
+            success=True,
+            message=f"{len(similar_templates)}개의 유사한 템플릿을 찾았습니다.",
+            query=request.query,
+            similar_templates=similar_templates,
+            category_patterns=recommendations['category_patterns'],
+            suggestions=recommendations['suggestions']
+        )
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"유사 템플릿 검색 중 오류가 발생했습니다: {str(e)}"
+        )
+
+@router.get("/templates/vector-store-info", response_model=TemplateVectorStoreInfoResponse)
+async def get_template_vector_store_info():
+    """
+    템플릿 벡터 스토어 정보 조회
+    """
+    try:
+        store_info = template_vector_store_service.get_store_info()
+
+        return TemplateVectorStoreInfoResponse(
+            success=True,
+            message="템플릿 벡터 스토어 정보를 성공적으로 조회했습니다.",
+            templates_count=store_info['templates_count'],
+            patterns_count=store_info['patterns_count'],
+            status=store_info['status'],
+            persist_directory=store_info.get('persist_directory')
+        )
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"벡터 스토어 정보 조회 중 오류가 발생했습니다: {str(e)}"
+        )

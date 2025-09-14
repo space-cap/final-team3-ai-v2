@@ -103,13 +103,13 @@ Index('idx_user_sessions', 'user_id', 'is_active')
 **구현 전략:**
 1. **문서 처리 파이프라인** 설계
 2. **청킹 전략** 결정 (1000자 단위, 200자 오버랩)
-3. **임베딩 모델** 선택 (OpenAI text-embedding-ada-002)
+3. **임베딩 모델** 선택 (OpenAI text-embedding-3-small)
 
 **핵심 구현:**
 ```python
 class VectorStoreService:
     def __init__(self):
-        self.embeddings = OpenAIEmbeddings(model="text-embedding-ada-002")
+        self.embeddings = OpenAIEmbeddings(model="text-embedding-3-small")
         self.client = chromadb.PersistentClient(path=self.persist_directory)
         
     def initialize_from_documents(self, documents_path: str):

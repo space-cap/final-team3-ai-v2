@@ -30,7 +30,7 @@ class VectorStoreService:
         # OpenAI 임베딩 모델 설정
         self.embeddings = OpenAIEmbeddings(
             openai_api_key=os.getenv('OPENAI_API_KEY'),
-            model="text-embedding-ada-002"
+            model="text-embedding-3-small"
         )
         
         # Chroma 클라이언트 설정

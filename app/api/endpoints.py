@@ -16,6 +16,7 @@ from app.api.schemas import *
 from app.models import Session as DBSession, Query, Template, Prompt
 from app.models.queries import QueryStatus
 from app.services.rag_service import rag_service
+from app.services.token_service import token_service
 try:
     from app.services.vector_store_simple import simple_vector_store_service as vector_store_service
 except ImportError:
@@ -151,6 +152,12 @@ async def generate_template(
             db.commit()
             db.refresh(new_template)
             
+            # TokenMetrics 객체를 스키마 모델로 변환
+            token_metrics_dict = None
+            if rag_response.token_metrics:
+                from dataclasses import asdict
+                token_metrics_dict = TokenMetrics(**asdict(rag_response.token_metrics))
+
             return TemplateGenerationResponse(
                 success=True,
                 message="템플릿이 성공적으로 생성되었습니다.",
@@ -158,7 +165,8 @@ async def generate_template(
                 template_id=new_template.template_id,
                 template_content=clean_template_content,
                 template_analysis=analysis,
-                processing_time=rag_response.processing_time
+                processing_time=rag_response.processing_time,
+                token_metrics=token_metrics_dict
             )
             
         except Exception as e:
@@ -233,6 +241,12 @@ async def query_policies(
             
             db.commit()
             
+            # TokenMetrics 객체를 스키마 모델로 변환
+            token_metrics_dict = None
+            if rag_response.token_metrics:
+                from dataclasses import asdict
+                token_metrics_dict = TokenMetrics(**asdict(rag_response.token_metrics))
+
             return QueryResponse(
                 success=True,
                 message="질의에 대한 응답이 생성되었습니다.",
@@ -240,7 +254,8 @@ async def query_policies(
                 answer=rag_response.answer,
                 source_documents=rag_response.source_documents,
                 confidence_score=rag_response.confidence_score,
-                processing_time=rag_response.processing_time
+                processing_time=rag_response.processing_time,
+                token_metrics=token_metrics_dict
             )
             
         except Exception as e:
@@ -408,6 +423,38 @@ async def search_policies(request: PolicySearchRequest):
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"정책 검색 중 오류가 발생했습니다: {str(e)}"
+        )
+
+@router.post("/tokens/usage", response_model=TokenUsageResponse)
+async def get_token_usage(
+    request: TokenUsageRequest,
+    db: Session = Depends(get_db)
+):
+    """
+    토큰 사용량 통계 조회
+    """
+    try:
+        # 토큰 서비스를 통한 사용량 통계 조회
+        stats = token_service.get_usage_stats(
+            session_id=request.session_id,
+            start_date=request.start_date,
+            end_date=request.end_date,
+            model_name=request.model_name
+        )
+
+        # 통계 모델로 변환
+        token_stats = TokenUsageStats(**stats)
+
+        return TokenUsageResponse(
+            success=True,
+            message="토큰 사용량 통계를 성공적으로 조회했습니다.",
+            stats=token_stats
+        )
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"토큰 사용량 조회 중 오류가 발생했습니다: {str(e)}"
         )
 
 @router.get("/health", response_model=HealthResponse)

@@ -11,8 +11,8 @@ from pathlib import Path
 
 try:
     import faiss
-    from langchain.vectorstores import FAISS
-    from langchain.embeddings.openai import OpenAIEmbeddings
+    from langchain_community.vectorstores import FAISS
+    from langchain_openai import OpenAIEmbeddings
     from langchain.text_splitter import RecursiveCharacterTextSplitter
     from langchain.docstore.document import Document
 

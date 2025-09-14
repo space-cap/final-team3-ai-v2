@@ -18,6 +18,7 @@ try:
     from app.services.vector_store_simple import simple_vector_store_service as vector_store_service
 except ImportError:
     from app.services.vector_store import vector_store_service
+from app.services.token_service import token_service, TokenMetrics
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -30,6 +31,7 @@ class RAGResponse:
     confidence_score: float
     processing_time: float
     metadata: Dict[str, Any]
+    token_metrics: Optional[TokenMetrics] = None
 
 class RAGService:
     """
@@ -136,15 +138,31 @@ class RAGService:
                 "question": enhanced_query,
                 "chat_history": self.memory.chat_memory.messages
             })
-            
+
+            # 처리 시간 계산 (토큰 추적 전)
+            processing_time = time.time() - start_time
+
+            # 토큰 사용량 추적
+            token_metrics_obj = None
+            try:
+                metrics, usage_record = token_service.track_llm_call(
+                    llm_response=result,
+                    model_name=self.llm.model_name,
+                    provider="openai",
+                    session_id=session_id,
+                    request_type="rag_query",
+                    user_query=query,
+                    processing_time=processing_time
+                )
+                token_metrics_obj = metrics
+            except Exception as e:
+                print(f"토큰 추적 중 오류: {e}")
+
             # 소스 문서 정보 처리
             source_docs = self._process_source_documents(result.get("source_documents", []))
-            
+
             # 신뢰도 점수 계산
             confidence_score = self._calculate_confidence_score(result, source_docs)
-            
-            # 처리 시간 계산
-            processing_time = time.time() - start_time
             
             # 응답 생성
             response = RAGResponse(
@@ -158,7 +176,8 @@ class RAGService:
                     "session_id": session_id,
                     "model_used": self.llm.model_name,
                     "retrieval_count": len(source_docs)
-                }
+                },
+                token_metrics=token_metrics_obj
             )
             
             return response

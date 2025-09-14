@@ -8,7 +8,8 @@ import os
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from config.database import create_database_if_not_exists, create_tables, check_connection
-from app.models import Session, Query, Template, Prompt
+from app.models import Session, Query, Template, Prompt, TokenUsage, TokenPricing
+from app.services.token_service import initialize_default_pricing
 
 def init_database():
     """
@@ -34,7 +35,11 @@ def init_database():
         # 4. 기본 프롬프트 데이터 삽입
         print("4. 기본 데이터 삽입 중...")
         insert_default_prompts()
-        
+
+        # 5. 기본 토큰 가격 정보 삽입
+        print("5. 기본 토큰 가격 정보 삽입 중...")
+        initialize_default_pricing()
+
         print("=== 데이터베이스 초기화 완료 ===")
         
     except Exception as e:

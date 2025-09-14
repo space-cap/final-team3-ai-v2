@@ -18,6 +18,18 @@ class ErrorResponse(BaseResponse):
     error_code: str = Field(description="오류 코드")
     error_details: Optional[Dict[str, Any]] = Field(default=None, description="오류 상세 정보")
 
+# 토큰 사용량 관련 스키마 (먼저 정의)
+class TokenMetrics(BaseModel):
+    """토큰 메트릭"""
+    prompt_tokens: int = Field(description="입력 토큰 수")
+    completion_tokens: int = Field(description="출력 토큰 수")
+    total_tokens: int = Field(description="총 토큰 수")
+    prompt_cost: float = Field(description="입력 토큰 비용 (USD)")
+    completion_cost: float = Field(description="출력 토큰 비용 (USD)")
+    total_cost: float = Field(description="총 비용 (USD)")
+    model_name: str = Field(description="사용된 모델명")
+    provider: str = Field(description="AI 서비스 제공자")
+
 # 세션 관련 스키마
 class SessionCreate(BaseModel):
     """세션 생성 요청"""
@@ -51,6 +63,7 @@ class TemplateGenerationResponse(BaseResponse):
     template_content: str = Field(description="템플릿 내용")
     template_analysis: Dict[str, Any] = Field(description="템플릿 분석 결과")
     processing_time: float = Field(description="처리 시간(초)")
+    token_metrics: Optional[TokenMetrics] = Field(None, description="토큰 사용량 정보")
 
 class TemplateAnalysis(BaseModel):
     """템플릿 분석 결과"""
@@ -78,6 +91,7 @@ class QueryResponse(BaseResponse):
     source_documents: List[Dict[str, Any]] = Field(description="참조 문서")
     confidence_score: float = Field(ge=0.0, le=1.0, description="신뢰도 점수")
     processing_time: float = Field(description="처리 시간(초)")
+    token_metrics: Optional[TokenMetrics] = Field(None, description="토큰 사용량 정보")
 
 # 템플릿 조회 관련 스키마
 class TemplateListRequest(BaseModel):
@@ -139,6 +153,27 @@ class PolicySearchResponse(BaseResponse):
     query: str = Field(description="검색 쿼리")
     documents: List[PolicyDocument] = Field(description="검색 결과 문서")
     total_results: int = Field(description="전체 결과 수")
+
+class TokenUsageRequest(BaseModel):
+    """토큰 사용량 조회 요청"""
+    session_id: Optional[str] = Field(None, description="세션 ID (선택)")
+    start_date: Optional[datetime] = Field(None, description="시작 날짜")
+    end_date: Optional[datetime] = Field(None, description="종료 날짜")
+    model_name: Optional[str] = Field(None, description="모델명 필터")
+
+class TokenUsageStats(BaseModel):
+    """토큰 사용량 통계"""
+    total_requests: int = Field(description="총 요청 수")
+    total_tokens: int = Field(description="총 토큰 수")
+    total_cost: float = Field(description="총 비용 (USD)")
+    avg_tokens_per_request: float = Field(description="요청당 평균 토큰 수")
+    avg_cost_per_request: float = Field(description="요청당 평균 비용 (USD)")
+    models_used: List[str] = Field(description="사용된 모델 목록")
+    success_rate: float = Field(description="성공률 (%)")
+
+class TokenUsageResponse(BaseResponse):
+    """토큰 사용량 응답"""
+    stats: TokenUsageStats = Field(description="토큰 사용량 통계")
 
 # 시스템 상태 관련 스키마
 class SystemStatus(BaseModel):
